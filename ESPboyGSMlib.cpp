@@ -10,7 +10,7 @@
 
 
 #include "Arduino.h"
-#include "ESPboyGSM.h"
+#include "ESPboyGSMlib.h"
 #include <SoftwareSerial.h>
 
 
@@ -25,107 +25,177 @@ ESPboyGSM::ESPboyGSM(uint8_t rx, uint8_t tx) : SoftwareSerial(rx, tx){
 bool ESPboyGSM::init(uint32_t baud) {
 	_baud = baud;
 	this->begin(_baud);
+	this->setTimeout(1000);
+	delay(500);
 	_buffer.reserve(BUFFER_RESERVE_MEMORY);
-	this->print(F("AT\r"));
+	_command.reserve(COMMAND_RESERVE_MEMORY);
+	_command = "AT";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
-		if( (_buffer.indexOf("OK") ) != -1)  {
-			return true;
-		}
-		else {
-			return false;
-		}
+    if( (_buffer.indexOf("OK") ) != -1)  return(true);
+	else return(false);
+}
+
+
+
+bool ESPboyGSM::sendCommand(String comm, bool waitOK){
+    _command = comm;
+	this->print(_command + "\r");
+	delay(500);
+	if (waitOK == true){	
+		_buffer = _readSerial();
+		if( (_buffer.indexOf("OK") ) != -1) return(true);
+		else return(false);
+	}
+	else return(true);
+}
+
+
+
+//serial available
+bool ESPboyGSM::_available(){
+   return(this->available());
+}
+
+
+//serial read
+String ESPboyGSM::_read(){
+String readSerial;
+   readSerial = this->readString();
+   
+   for (uint16_t i=0; i<readSerial.length(); i++){
+     if ((readSerial[i] <  ' ') || (readSerial[i] > 'z'))
+       readSerial[i] = ' ';
+   }
+   readSerial.replace("  ", " ");
+   readSerial.replace("  ", " ");
+   readSerial.trim();
+   return readSerial;
+}
+
+
+String ESPboyGSM::getAnswer(){
+  for (uint16_t i=0; i<_buffer.length(); i++){
+    if ((_buffer[i] <  ' ') || (_buffer[i] > 'z'))
+      _buffer[i] = ' ';
+  }
+ _buffer.replace("  ", " ");
+ _buffer.replace("  ", " ");
+ _buffer.trim();
+ return _buffer;
+}
+
+
+String ESPboyGSM::getCommand(){
+ return _command;
 }
 
 
 //SIM800 error answer: true=numerical, false=text
-bool ESPboyGSM::setSIManswerStyle(bool type = false) {
+bool ESPboyGSM::setSIManswerStyle(bool type) {
         if (type == true){
-			this->print(F("ATV0\r"));
+            _command = "ATV0";
+			this->print(_command + "\r");
 		}
 		else{
-			this->print(F("ATV1\r"));
+		    _command = "ATV1";
+			this->print(_command + "\r");
 		}
 		_buffer = _readSerial();
-		if( (_buffer.indexOf("OK") ) != -1)  {
-			return true;
-		}
-		else {
-			return false;
-		}
+		if( (_buffer.indexOf("OK") ) != -1) return(true);
+		else return(false);
 }
 
 
 //SIM800 URC mode true-on, false-off
-bool ESPboyGSM::setURC(bool type = true) {
-		if (type = true){
-			this->print(F("AT+CLIP=1\r"));
+bool ESPboyGSM::setURC(bool type) {
+		if (type == true){
+		    _command = "AT+CLIP=1";
+			this->print(_command + "\r");
 		}
 		else{
-			this->print(F("AT+CLIP=0\r"));
+		    _command = "AT+CLIP=0";
+			this->print(_command + "\r");
 		}
 		_buffer = _readSerial();
-		if( (_buffer.indexOf("OK") ) != -1)  {
-			return true;
-		}
-		else {
-			return false;
-		}
+		if( (_buffer.indexOf("OK") ) != -1) return(true);
+		else return(false);
 }
 
 
 //Error report level 0="ERROR", 1=error code, 2=error text description
-bool ESPboyGSM::setErrorReport(uint8_t level = 1) {
+bool ESPboyGSM::setErrorReport(uint8_t level) {
 	if(level != 0 || level != 1 || level != 1) {
-		return false;
+		return(false);
 	}
 	else {
-		this->print(F("AT+CMEE="));
-		this->print(String(level));
-		this->print(F("\r"));
+	    _command = "AT+CMEE=" + String(level);
+		this->print(_command + "\r");
 		_buffer = _readSerial();
 		if( (_buffer.indexOf("OK") ) != -1)  {
-			return true;
+			return(true);
 		}
 		else {
-			return false;
+			return(false);
 		}
 	}
 }
 
 
 // ECHO true=on, false=off
-bool ESPboyGSM::setEcho(bool type = false) {
-    if (type = true){
-    	this->print(F("ATE1\r"));
+bool ESPboyGSM::setEcho(bool type) {
+    if (type == true){
+        _command = "ATE1";
+    	this->print(_command + "\r");
     }
     else{
-		this->print(F("ATE0\r"));
+        _command = "ATE0";
+		this->print(_command + "\r");
 	}
 	_buffer = _readSerial();
 	if ( (_buffer.indexOf("OK") )!=-1 ) {
-   		return true;
+   		return(true);
    	}
    	else {
-   		return false;
+   		return(false);
+   	}
+}
+
+
+// ANSWER true=on, false=off
+bool ESPboyGSM::setAnswer(bool type) {
+    if (type == true){
+        _command = "ATV1";
+    	this->print(_command + "\r");
+    }
+    else{
+        _command = "ATV0";
+		this->print(_command + "\r");
+	}
+	_buffer = _readSerial();
+	if ( (_buffer.indexOf("OK") )!=-1 ) {
+   		return(true);
+   	}
+   	else {
+   		return(false);
    	}
 }
 
 
 // set phone functionality 0=min, 1=full, 4-...
-bool ESPboyGSM::setPhoneFunc(uint8_t level = 1) {
+bool ESPboyGSM::setPhoneFunc(uint8_t level) {
 	if(level != 0 || level != 1 || level != 4) {
-		return false;
+		return(false);
 	}
 	else {
-		this->print(F("AT+CFUN="));
-		this->print(String(level));
-		this->print(F("\r"));
+	    _command = "AT+CFUN=" + String(level);
+		this->print(_command + "\r");
 		_buffer = _readSerial();
 		if( (_buffer.indexOf("OK") ) != -1)  {
-			return true;
+			return(true);
 		}
 		else {
-			return false;
+			return(false);
 		}
 	}
 }
@@ -133,20 +203,22 @@ bool ESPboyGSM::setPhoneFunc(uint8_t level = 1) {
 
 //save param
 bool ESPboyGSM::saveParam () {
-	this->print(F("AT&W\r"));
+    _command = "AT&W";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if( (_buffer.indexOf("OK") ) != -1)  {
-		return true;
+		return(true);
 	}
 	else {
-		return false;
+		return(false);
 	}
 }
 
 
 //get ringer volume [0-100]
 uint8_t ESPboyGSM::ringerVolume() {
-	this->print(F("AT+CRSL?\r"));
+    _command = "AT+CRSL?";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	String veri = _buffer.substring(7, _buffer.indexOf("OK"));
 	veri.trim();
@@ -155,25 +227,25 @@ uint8_t ESPboyGSM::ringerVolume() {
 
 
 //set ringer volume [0-100]
-bool ESPboyGSM::setRingerVolume(uint8_t level = 100) {
+bool ESPboyGSM::setRingerVolume(uint8_t level) {
 	if(level > 100) {
 		level = 100;
 	}
-	this->print(F("AT+CRSL="));
-	this->print(level);
-	this->print(F("\r"));
+	_command = "AT+CRSL=" + (String)level;
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if(_buffer.indexOf("OK") != -1) {
-		return true;
+		return(true);
 	} else {
-		return false;
+		return(false);
 	}
 }
 
 
 //get speaker volume [0-100]
 uint8_t ESPboyGSM::speakerVolume() {
-	this->print(F("AT+CLVL?\r"));
+    _command = "AT+CLVL?";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	String veri = _buffer.substring(7, _buffer.indexOf("OK"));
 	veri.trim();
@@ -182,41 +254,40 @@ uint8_t ESPboyGSM::speakerVolume() {
 
 
 //set speaker volume [0-100]
-bool ESPboyGSM::setSpeakerVolume(uint8_t level = 100) {
+bool ESPboyGSM::setSpeakerVolume(uint8_t level) {
 	if(level > 100) {
 		level = 100;
 	}
-	this->print(F("AT+CLVL="));
-	this->print(level);
-	this->print(F("\r"));
+    _command = "AT+CLVL=" + (String)level;
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if (_buffer.indexOf("OK") != -1) {
-		return true;
+		return(true);
 	}
 	else {
-		return false;
+		return(false);
 	}
 }
 
 
 //auto answer 0=no, n=after "n" number of rings
-bool ESPboyGSM::setAutoAnswer (uint8_t level = 0) {
-	this->print(F("ATS0="));
-	this->print(String(level));
-	this->print(F("\r"));
+bool ESPboyGSM::setAutoAnswer (uint8_t level) {
+    _command = "ATS0=" + String(level);
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if( (_buffer.indexOf("OK") ) != -1)  {
-		return true;
+		return(true);
 	}
 	else {
-		return false;
+		return(false);
 	}
 }
 
 
 // signal quality - 0-31 / 99=Unknown
 uint8_t ESPboyGSM::signalQuality() {
-	this->print(F("AT+CSQ\r"));
+    _command = "AT+CSQ";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if((_buffer.indexOf("+CSQ:")) != -1) {
 		return _buffer.substring(_buffer.indexOf("+CSQ: ")+6, _buffer.indexOf(",")).toInt();
@@ -228,40 +299,44 @@ uint8_t ESPboyGSM::signalQuality() {
 
 // is module connected to the operator?
 bool ESPboyGSM::isRegistered() {
-	this->print(F("AT+CREG?\r"));
+    _command = "AT+CREG?";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if( (_buffer.indexOf("+CREG: 0,1")) != -1 || (_buffer.indexOf("+CREG: 0,5")) != -1 || (_buffer.indexOf("+CREG: 1,1")) != -1 || (_buffer.indexOf("+CREG: 1,5")) != -1) {
-		return true;
+		return(true);
 	} else {
-		return false;
+		return(false);
 	}
 }
 
 
 // is SIM inserted?
 bool ESPboyGSM::isSimInserted() {
-	this->print(F("AT+CSMINS?\r"));
+    _command = "AT+CSMINS?";
+	this->print(_command + "\r");
+	delay(500);
 	_buffer = _readSerial();
 	if(_buffer.indexOf(",") != -1) {
-		String veri = _buffer.substring(_buffer.indexOf(","), _buffer.indexOf("OK"));
-		veri.trim();
+		String veri = _buffer.substring(_buffer.indexOf(",")+1, _buffer.indexOf(",")+2 );
+		veri.trim();	
 		if(veri == "1") {
-			return true;
+			return(true);
 		} else {
-			return false;
+			return(false);
 		}
 	} else {
-		return false;
+		return(false);
 	}
 }
 
 
 // operator name
 String ESPboyGSM::operatorName() {
-	this->print(F("AT+COPS?\r"));
+    _command = "AT+COPS?";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if(_buffer.indexOf(",") == -1) {
-		return "NOT CONNECTED";
+		return F("Not connected");
 	}
 	else {
 		 return _buffer.substring(_buffer.indexOf(",\"")+2, _buffer.lastIndexOf("\""));
@@ -271,15 +346,16 @@ String ESPboyGSM::operatorName() {
 // operator name from SIM
 String ESPboyGSM::operatorNameFromSim() {
 	this->flush();
-	this->print(F("AT+CSPN?\r"));
+	_command = "AT+CSPN?";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
-	yield(250);
+	delay(200);
 	_buffer = _readSerial();
 	if(_buffer.indexOf("OK") != -1) {
 		return _buffer.substring(_buffer.indexOf(" \"") + 2, _buffer.lastIndexOf("\""));
 	}
 	else {
-		return "NOT CONNECTED";
+		return F("Not connected");
 	}
 
 }
@@ -292,7 +368,8 @@ String ESPboyGSM::operatorNameFromSim() {
 4 Call in progress (MT is ready for commands from TA/TE, a call is in progress)
 */
 uint8_t ESPboyGSM::phoneStatus() {
-	this->print(F("AT+CPAS\r"));
+    _command = "AT+CPAS";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if((_buffer.indexOf("+CPAS: ")) != -1)
 	{
@@ -306,7 +383,8 @@ uint8_t ESPboyGSM::phoneStatus() {
 
 //manufacturer identification
 String ESPboyGSM::moduleManufacturer() {
-	this->print(F("AT+CGMI\r"));
+    _command = "AT+CGMI";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	String veri = _buffer.substring(8, _buffer.indexOf("OK"));
 	veri.trim();
@@ -317,7 +395,8 @@ String ESPboyGSM::moduleManufacturer() {
 
 //module identification
 String ESPboyGSM::moduleModel() {
-	this->print(F("AT+CGMM\r"));
+    _command = "AT+CGMM";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	String veri = _buffer.substring(8, _buffer.indexOf("OK"));
 	veri.trim();
@@ -328,7 +407,8 @@ String ESPboyGSM::moduleModel() {
 
 //revision identification of software release
 String ESPboyGSM::moduleRevision() {
-	this->print(F("AT+CGMR\r"));
+    _command = "AT+CGMR";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	String veri = _buffer.substring(_buffer.indexOf(":")+1 , _buffer.indexOf("OK"));
 	veri.trim();
@@ -338,7 +418,8 @@ String ESPboyGSM::moduleRevision() {
 
 //module IMEI
 String ESPboyGSM::moduleIMEI() {
-	this->print(F("AT+CGSN\r"));
+    _command = "AT+CGSN";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	String veri = _buffer.substring(8, _buffer.indexOf("OK"));
 	veri.trim();
@@ -349,7 +430,8 @@ String ESPboyGSM::moduleIMEI() {
 
 //international mobile subscriber identity
 String ESPboyGSM::moduleIMSI() {
-	this->print(F("AT+CIMI\r"));
+    _command = "AT+CIMI";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	String veri = _buffer.substring(8, _buffer.indexOf("OK"));
 	veri.trim();
@@ -359,7 +441,8 @@ String ESPboyGSM::moduleIMSI() {
 
 //ICCID
 String ESPboyGSM::moduleICCID() {
-	this->print(F("AT+CCID\r"));
+    _command = "AT+CCID";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	String veri = _buffer.substring(8, _buffer.indexOf("OK"));
 	veri.trim();
@@ -367,8 +450,10 @@ String ESPboyGSM::moduleICCID() {
 }
 
 
+
 String ESPboyGSM::moduleDebug() {
-	this->print(F("AT&V\r"));
+    _command = "AT&V";
+	this->print(_command + "\r");
 	return _readSerial();
 }
 
@@ -382,10 +467,9 @@ String ESPboyGSM::moduleDebug() {
 uint8_t ESPboyGSM::call(char* phone_number) {
 	bool colp = callIsCOLPActive();
 	_buffer = _readSerial();
-	yield(100);
-	this->print(F("ATD"));
-	this->print(phone_number);
-	this->print(";\r");
+	delay(100);
+	_command = "ATD" + (String)(phone_number);
+	this->print(_command + ";\r");
 	_buffer = _readSerial();
 	if (colp) {
 		if (_buffer.indexOf("BUSY") != -1){
@@ -414,10 +498,11 @@ uint8_t ESPboyGSM::call(char* phone_number) {
 
 // answer
 bool ESPboyGSM::callAnswer() {
-	this->print(F("ATA\r"));
+    _command = "ATA";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if (_buffer.indexOf("OK") != -1){
-		return true;
+		return(true);
 	}
 	else {
 		false;
@@ -427,10 +512,11 @@ bool ESPboyGSM::callAnswer() {
 
 // hang off
 bool ESPboyGSM::callHangoff() {
-	this->print(F("ATH\r"));
+	_command = "ATH";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if(_buffer.indexOf("OK") != -1){
-		return true;
+		return(true);
 	} 
 	else {
 		false;
@@ -444,7 +530,8 @@ bool ESPboyGSM::callHangoff() {
 	3 - Ringing (MT is ready for commands from TA/TE, but the ringer is active)
 	4 - Call in progress */
 uint8_t ESPboyGSM::callStatus() {
-	this->print(F("AT+CPAS\r"));
+    _command = "AT+CPAS";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	return _buffer.substring(_buffer.indexOf("+CPAS: ") + 7, _buffer.indexOf("+CPAS: ") + 9).toInt();
 }
@@ -452,13 +539,12 @@ uint8_t ESPboyGSM::callStatus() {
 
 // COLP=false, module returns OK just after ATD command
 // COLP=true, return BUSY / NO DIAL TONE / NO CARRIER / OK - after taking call other side
-bool ESPboyGSM::callSetCOLP(bool active = 1) {
-	this->print(F("AT+COLP="));
-	this->print((uint8_t)active);
-	this->print(F("\r"));
+bool ESPboyGSM::callSetCOLP(bool active) {
+    _command = "AT+COLP=" + (String) active;
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if (_buffer.indexOf("OK") != -1){
-		return true;
+		return(true);
 	}
 	else {
 		false;
@@ -468,10 +554,11 @@ bool ESPboyGSM::callSetCOLP(bool active = 1) {
 
 // is COLP active?
 bool ESPboyGSM::callIsCOLPActive() {
-	this->print(F("AT+COLP?\r"));
+    _command = "AT+COLP=?";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
-	if (_buffer.indexOf("+COLP: 1") != -1) {
-		return true;
+	if (_buffer.indexOf(",1") != -1) {
+		return(true);
 	}
 	else {
 		false;
@@ -485,19 +572,21 @@ bool ESPboyGSM::callIsCOLPActive() {
 /////////
 
 // SMS text mode on/off
-bool ESPboyGSM::smsTextMode(bool textModeON = true) {
+bool ESPboyGSM::smsTextMode(bool textModeON) {
 	if (textModeON == true) {
-		this->print(F("AT+CMGF=1\r"));
+	    _command = "AT+CMGF=1";
+		this->print(_command + "\r");
 	}
 	else {
-		this->print(F("AT+CMGF=0\r"));
+	    _command = "AT+CMGF=0";
+		this->print(_command + "\r");
 	}
 	_buffer = _readSerial();
 	if (_buffer.indexOf("OK") != -1) {
-		return true;
+		return(true);
 	}
 	else{
-		return false;
+		return(false);
 	}
 }
 
@@ -505,9 +594,8 @@ bool ESPboyGSM::smsTextMode(bool textModeON = true) {
 
 // send SMS
 bool ESPboyGSM::smsSend(char* number, char* message) {
-	this->print(F("AT+CMGS=\"")); 
-	this->print(number);
-	this->print(F("\"\r"));
+    _command = "AT+CMGS=\"" + (String)number;
+	this->print( _command + F("\"\r"));
 	_buffer = _readSerial();
 	this->print(message);
 	this->print(F("\r"));
@@ -516,21 +604,22 @@ bool ESPboyGSM::smsSend(char* number, char* message) {
 	_buffer += _readSerial();
 	if (((_buffer.indexOf("+CMGS:")) != -1)) {
 		if (((_buffer.indexOf("OK")) != -1)){
-			return true;
+			return(true);
 		}
 		else {
-			return false;
+			return(false);
 		}
 	}
 	else {
-		return false;
+		return(false);
 	}
 }
 
 
 // return unread SMS
 String ESPboyGSM::smsListUnread() {
-	this->print(F("AT+CMGL=\"REC UNREAD\",1\r"));
+    _command = "AT+CMGL=\"REC UNREAD\",1";
+    this->print(_command + "\r");
 	_buffer = _readSerial();
 	String donus = "";
 	if (_buffer.indexOf("ERROR") != -1) {
@@ -569,20 +658,14 @@ String ESPboyGSM::smsListUnread() {
 
 // return SMS no = index
 String ESPboyGSM::smsRead(uint8_t index, bool markRead) {
-	this->print(F("AT+CMGR="));
-	this->print(index);
-	this->print(",");
-	if (markRead == true) {
-		this->print("0");
-	}
-	else {
-		this->print("1");
-	}
-	this->print(F("\r"));
+ String klasor, okundumu, telno, zaman, mesaj;
+    _command = "AT+CMGR=" + (String)index + ",";
+	if (markRead == true) _command += "0";
+	else _command += "1";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	String durum = "INDEX_NO_ERROR";
 	if (_buffer.indexOf("+CMGR:") != -1) {
-		String klasor, okundumu, telno, zaman, mesaj;
 		klasor = "UNKNOWN";
 		okundumu = "UNKNOWN";
 		if (_buffer.indexOf("REC UNREAD") != -1) {
@@ -625,28 +708,28 @@ String ESPboyGSM::smsRead(uint8_t index, bool markRead) {
 
 // delete SMS no = index
 bool ESPboyGSM::smsDeleteOne(uint8_t index) {
-	this->print(F("AT+CMGD="));
-	this->print(index);
-	this->print(F(",0\r"));
+    _command = "AT+CMGD=" + (String)index + ",0";
+    this->print(_command + "\r");
 	_buffer = _readSerial();
 	if (_buffer.indexOf("OK") != -1) {
-		return true;
+		return(true);
 	}
 	else {
-		return false;
+		return(false);
 	}
 }
 
 
 // delete all SMS been read
 bool ESPboyGSM::smsDeleteAllRead() {
-	this->print(F("AT+CMGD=1,1\r"));
+    _command = "AT+CMGD=1,1";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if (_buffer.indexOf("OK") != -1) {
-		return true;
+		return(true);
 	}
 	else {
-		return false;
+		return(false);
 	}
 }
 
@@ -654,13 +737,14 @@ bool ESPboyGSM::smsDeleteAllRead() {
 
 // delete all SMS
 bool ESPboyGSM::smsDeleteAll() {
-	this->print(F("AT+CMGD=1,4\r"));
+    _command = "AT+CMGD=1,4";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if (_buffer.indexOf("OK") != -1) {
-		return true;
+		return(true);
 	}
 	else {
-		return false;
+		return(false);
 	}
 }
 
@@ -671,15 +755,14 @@ bool ESPboyGSM::smsDeleteAll() {
 ///////////////////
 
 bool ESPboyGSM::ussdSend(char* code) {
-	this->print(F("AT+CUSD=1,\""));
-	this->print(code);
-	this->print(F("\"\r"));
+    _command = "AT+CUSD=1,\"" + (String)code;
+    this->print(_command + "\"\r");
 	_buffer = _readSerial();
 	if (_buffer.indexOf("OK") != -1) {
-		return true;
+		return(true);
 	}
 	else {
-		return false;
+		return(false);
 	}
 }
 
@@ -700,26 +783,28 @@ String ESPboyGSM::ussdRead(String serialRaw) {
 //	TIME SECTION  //
 ////////////////////
 
-bool ESPboyGSM::setTimeFromOperator (bool optime = true){}
-		if (optime = true){
-			this->print(F("AT+CLTS=1\r"));
+bool ESPboyGSM::setTimeFromOperator (bool optime){
+		if (optime == true){
+			_command = "AT+CLTS=1";
 		}
 		else{
-			this->print(F("AT+CLTS=0\r"));
+			_command = "AT+CLTS=0";
 		}
+		this->print(_command + "\r");
 		_buffer = _readSerial();
 		if( (_buffer.indexOf("OK") ) != -1)  {
-			return true;
+			return(true);
 		}
 		else {
-			return false;
+			return(false);
 		}
 }
 
 
 
 bool ESPboyGSM::timeGet(uint8_t *day, uint8_t *month, uint16_t *year, uint8_t *hour, uint8_t *minute, uint8_t *second) {
-	this->print(F("AT+CCLK?\r"));
+	_command = "AT+CCLK?";
+	this->print(_command + "\r");
 	_buffer = _readSerial();
 	if (_buffer.indexOf("OK") != -1) {
 		_buffer = _buffer.substring(_buffer.indexOf("\"") + 1, _buffer.lastIndexOf("\"") - 1);
@@ -729,27 +814,25 @@ bool ESPboyGSM::timeGet(uint8_t *day, uint8_t *month, uint16_t *year, uint8_t *h
 		*hour = _buffer.substring(9, 11).toInt();
 		*minute = _buffer.substring(12, 14).toInt();
 		*second = _buffer.substring(15, 17).toInt();
-		return true;
+		return(true);
 	}
 	else {
-		return false}
+		return(false);}
 }
 
 
 
-/////////////
-// PRIVATE //
-/////////////
 
 String ESPboyGSM::_readSerial() {
 	uint64_t timeOld = millis();
 	while (!this->available() && !(millis() > timeOld + TIMEOUT_READ_SERIAL)){
-		yield(10);
+		delay(10);
 	}
 	String str = "";
 	if (this->available()){
 		str = this->readString();
 	}
+	else str = "time out";
 	str.trim();
 	return str;
 }
